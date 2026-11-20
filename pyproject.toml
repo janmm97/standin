@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "standin"
+version = "0.1.0"
+description = "Block the motion in Blender, cast photoreal AI actors with Higgsfield through the One CLI, and voice it with local models."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [{ name = "Jan (janmm97)" }]
+dependencies = []
+
+[project.optional-dependencies]
+voice = ["snac>=1.2", "torch>=2.2", "numpy>=1.26"]
+captions = ["faster-whisper>=1.0"]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.scripts]
+standin = "standin.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["standin*"]
+
+[tool.setuptools.package-data]
+standin = ["blender/*.py"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

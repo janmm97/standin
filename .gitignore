@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+
+# Secrets and local config (keep .env.example)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets.*
+
+# Renders, generated media and work folders
+out/
+renders/
+*.blend
+*.blend1
+*.mp4
+*.mov
+*.wav
+*.mp3
+*.png
+*.jpg
+*.jpeg
+!docs/**/*.png
+
+# Model weights (users download these themselves)
+*.gguf
+*.safetensors
+*.pt
+*.bin
