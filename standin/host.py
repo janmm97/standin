@@ -16,6 +16,14 @@ import uuid
 from pathlib import Path
 
 
+def split(template: str, nt: bool) -> list[str]:
+    """shlex.split; on Windows (non-POSIX mode, so backslashes survive) it keeps the quotes, so drop them."""
+    parts = shlex.split(template, posix=not nt)
+    if nt:
+        parts = [p[1:-1] if len(p) > 1 and p[0] == p[-1] and p[0] in "\"'" else p for p in parts]
+    return parts
+
+
 class Host:
     def __init__(self, run=subprocess.run, env=os.environ):
         self.up, self.rm = env.get("STANDIN_UPLOAD_CMD"), env.get("STANDIN_DELETE_CMD")
@@ -26,7 +34,11 @@ class Host:
 
     def _cmd(self, template: str, **kw) -> list[str]:
         # Split first, then fill in, so paths with spaces stay one argument.
-        parts = [t.format(**kw) for t in shlex.split(template, posix=os.name != "nt")]
+        parts = []
+        for t in split(template, nt=os.name == "nt"):
+            for name, value in kw.items():  # not str.format: other braces (JSON, ${VAR}) stay as typed
+                t = t.replace("{" + name + "}", value)
+            parts.append(t)
         if parts and (exe := shutil.which(parts[0])):
             parts[0] = exe  # Windows needs the full path for .cmd shims like wrangler
         return parts

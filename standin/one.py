@@ -20,9 +20,25 @@ def _one() -> str:
     return exe
 
 
+def _no_quotes(obj):
+    """Replace every " in the string values with '."""
+    if isinstance(obj, str):
+        return obj.replace('"', "'")
+    if isinstance(obj, dict):
+        return {k: _no_quotes(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_no_quotes(v) for v in obj]
+    return obj
+
+
 def execute(platform: str, action_id: str, key: str, data: dict | None = None,
             path_vars: dict | None = None, run=subprocess.run) -> dict:
-    cmd = [_one(), "--agent", "actions", "execute", platform, action_id, key]
+    exe = _one()
+    if exe.lower().endswith((".cmd", ".bat")):
+        # npm installs `one` as a .cmd shim on Windows and cmd.exe re-parses its arguments: a literal " in a
+        # model-written prompt would end the quoting and let a following & or | run as a command.
+        data, path_vars = _no_quotes(data), _no_quotes(path_vars)
+    cmd = [exe, "--agent", "actions", "execute", platform, action_id, key]
     if path_vars:
         cmd += ["--path-vars", json.dumps(path_vars)]
     if data is not None:

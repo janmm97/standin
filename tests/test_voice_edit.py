@@ -85,3 +85,13 @@ def test_real_edit(tmp_path):
     (tmp_path / "c.srt").write_text(edit.srt([(0, 1, "hello there")]), encoding="utf-8")
     out = edit.finish(joined, tmp_path / "final.mp4", tmp_path / "vo.wav", tmp_path / "c.srt")
     assert out.stat().st_size > 1000
+
+
+def test_concat_list_escapes_single_quotes(tmp_path, monkeypatch):
+    monkeypatch.setattr(edit, "find_ffmpeg", lambda: "ffmpeg")
+    class R:
+        returncode, stderr = 0, ""
+
+    edit.concat([tmp_path / "it's.mp4"], tmp_path / "v.mp4", run=lambda *a, **k: R())
+    line = (tmp_path / "v.txt").read_text(encoding="utf-8").strip()
+    assert line.endswith("it'\\''s.mp4'") and line.startswith("file '")

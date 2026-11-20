@@ -51,9 +51,14 @@ def _ffmpeg(args: list[str], cwd: Path, run) -> None:
         raise RuntimeError(f"ffmpeg failed: {p.stderr[-800:]}")
 
 
+def _quote(path: Path) -> str:
+    r"""A path for ffmpeg's concat list: single-quoted, with each ' written as '\''."""
+    return "'" + path.resolve().as_posix().replace("'", "'\\''") + "'"
+
+
 def concat(segments: list[Path], out: Path, run=subprocess.run) -> Path:
     lst = out.with_suffix(".txt")
-    lst.write_text("".join(f"file '{s.resolve().as_posix()}'\n" for s in segments), encoding="utf-8")
+    lst.write_text("".join(f"file {_quote(s)}\n" for s in segments), encoding="utf-8")
     _ffmpeg(["-f", "concat", "-safe", "0", "-i", lst.name, "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
              "-r", "24", out.name], out.parent, run)
     return out

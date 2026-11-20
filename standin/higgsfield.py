@@ -3,7 +3,9 @@ and animate between keyframes (Veo 3.1 first/last frame). Every call here costs 
 
 from __future__ import annotations
 
+import os
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -20,6 +22,7 @@ ACTIONS = {
 }
 # USD, rough public prices (2026-11); shown before any paid run.
 PRICE = {"soul": 0.02, "nano_banana": 0.04, "veo_per_s": 0.40, "veo_fast_per_s": 0.10}
+MAX_POLL_ERRORS = 3
 DONE, BAD = "completed", ("failed", "nsfw", "canceled")
 MEDIA = (".png", ".jpg", ".jpeg", ".webp", ".mp4", ".mov", ".webm")
 
@@ -84,13 +87,22 @@ class Client:
             raise one.OneError(f"{model}: no request_id in {str(r)[:300]}")
         return r["request_id"]
 
-    def wait(self, request_id: str) -> list[str]:
-        waited = 0
+    def wait(self, request_id: str, ignore=()) -> list[str]:
+        """Poll until done; returns the result URLs, minus any in `ignore` (the inputs we sent)."""
+        waited, misses = 0, 0
         while True:
-            r = self.execute(PLATFORM, ACTIONS["status"], self.key, None, {"requestId": request_id})
+            try:
+                r = self.execute(PLATFORM, ACTIONS["status"], self.key, None, {"requestId": request_id})
+                misses = 0
+            except one.OneError:
+                # The job is already paid for: ride out a flaky poll instead of abandoning it.
+                misses += 1
+                if misses > MAX_POLL_ERRORS:
+                    raise
+                r = {"status": "unknown"}
             status = r.get("status")
             if status == DONE:
-                found = urls(r)
+                found = [u for u in urls(r) if u not in ignore]
                 if not found:
                     raise one.OneError(f"{request_id} completed but no media URL in {str(r)[:300]}")
                 return found
@@ -102,7 +114,7 @@ class Client:
             waited += self.poll_s
 
     def run(self, model: str, body: dict, dest: Path, fetch=None) -> Path:
-        url = self.wait(self.submit(model, body))[0]
+        url = self.wait(self.submit(model, body), ignore=set(urls(body)))[0]
         dest.parent.mkdir(parents=True, exist_ok=True)
         (fetch or _fetch)(url, dest)
         return dest
@@ -111,5 +123,18 @@ class Client:
 def _fetch(url: str, dest: Path) -> None:
     if not url.startswith("https://"):
         raise one.OneError(f"refusing non-https result URL: {url[:80]}")
-    with urllib.request.urlopen(url, timeout=300) as r, open(dest, "wb") as f:  # noqa: S310 (https result URL)
-        f.write(r.read())
+    tmp = dest.with_name(dest.name + ".part")  # never leave a half-written file under the real name
+    with _OPENER.open(url, timeout=300) as r, open(tmp, "wb") as f:
+        while chunk := r.read(1 << 20):
+            f.write(chunk)
+    os.replace(tmp, dest)
+
+
+class _HttpsOnly(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not newurl.startswith("https://"):
+            raise urllib.error.URLError(f"refusing redirect to non-https URL: {newurl[:80]}")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(_HttpsOnly)
