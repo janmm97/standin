@@ -91,5 +91,46 @@ def test_batch_runs_each_row_and_counts_failures(tmp_path, monkeypatch, capsys):
 
     monkeypatch.setattr(cli, "preview", fake_preview)
     assert cli.main(["batch", str(f), "--template"]) == 1
-    assert seen == [("first clip", "16:9"), ("second clip", "9:16")]
+    assert seen == [("first clip", "16:9"), ("second clip", None)]  # None: get_plan applies 9:16
     assert "1 ok, 1 failed" in capsys.readouterr().out
+
+
+def test_saved_plan_keeps_its_aspect_unless_overridden(tmp_path):
+    f = tmp_path / "plan.json"
+    plan = {"aspect": "16:9", "beats": [{"action": "wave", "duration": 4}]}
+    f.write_text(json.dumps(plan), encoding="utf-8")
+    base = ["plan", "--plan", str(f), "--out", str(tmp_path)]
+    assert cli.get_plan(cli.parser().parse_args(base))["aspect"] == "16:9"
+    assert cli.get_plan(cli.parser().parse_args([*base, "--aspect", "9:16"]))["aspect"] == "9:16"
+
+
+def test_plan_file_that_is_not_an_object_is_an_error(tmp_path, capsys):
+    f = tmp_path / "plan.json"
+    f.write_text("[1, 2]", encoding="utf-8")
+    assert cli.main(["plan", "--plan", str(f), "--out", str(tmp_path)]) == 1
+    assert "not a plan" in capsys.readouterr().out
+
+
+def test_make_refuses_to_spend_when_keyframe_count_is_wrong(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(cli.blender_run, "render", lambda plan, d, mode: [d / "k.png"])
+    ran = []
+
+    class FakeClient:
+        def run(self, *a):
+            ran.append(a)
+
+    monkeypatch.setattr(cli.higgsfield, "Client", FakeClient)
+    monkeypatch.setattr(cli, "Host", lambda: object())
+    assert cli.main(["make", "x", "--template", "--yes", "--out", str(tmp_path)]) == 1
+    assert not ran and "expected 4" in capsys.readouterr().out
+
+
+def test_timeouts_are_reported_not_a_traceback(monkeypatch, capsys):
+    import subprocess
+
+    def slow(a):
+        raise subprocess.TimeoutExpired("blender", 1)
+
+    monkeypatch.setattr(cli, "preview", slow)
+    assert cli.main(["preview", "x", "--template"]) == 1
+    assert "error:" in capsys.readouterr().out

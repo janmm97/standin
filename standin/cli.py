@@ -8,12 +8,15 @@ import importlib.util
 import json
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
 from . import blender_run, edit, higgsfield, models, one, voice
 from .host import Host
 from .plan import ASPECTS, make_plan, normalize, template_plan
+
+DEFAULT_ASPECT = "9:16"
 
 
 def say(msg: str) -> None:
@@ -26,15 +29,20 @@ def slug(text: str) -> str:
 
 def get_plan(a) -> dict:
     if a.plan:
-        return normalize(json.loads(Path(a.plan).read_text(encoding="utf-8")), a.aspect)
+        raw = json.loads(Path(a.plan).read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            raise ValueError(f"{a.plan} is not a plan (expected a JSON object)")
+        # A saved plan keeps its own aspect unless --aspect is given.
+        return normalize(raw, a.aspect or raw.get("aspect") or DEFAULT_ASPECT)
+    aspect = a.aspect or DEFAULT_ASPECT
     if a.template:
         say("plan: template")
-        return template_plan(a.brief, a.aspect)
+        return template_plan(a.brief, aspect)
     chosen, why = models.pick_chat(models.list_models())
     if chosen:
         say(f"plan model: {chosen.key} ({why}); loading...")
         models.ensure_loaded(chosen.key)
-    plan, source = make_plan(a.brief, chosen.key if chosen else None, a.aspect)
+    plan, source = make_plan(a.brief, chosen.key if chosen else None, aspect)
     say(f"plan: {source}")
     return plan
 
@@ -126,8 +134,10 @@ def make(a) -> Path | None:
     if not a.yes:
         say(f"no paid calls made. Check {d / 'plan.json'}, then add --yes to generate.")
         return None
+    client, host = higgsfield.Client(), Host()  # fail on missing setup before the slow render
     keys = blender_run.render(plan, d, "keys")
-    client, host = higgsfield.Client(), Host()
+    if len(keys) != len(plan["beats"]) + 1:  # one keyframe per beat boundary; check before spending
+        raise RuntimeError(f"Blender wrote {len(keys)} keyframes, expected {len(plan['beats']) + 1}")
     try:
         cast_urls = []
         for i, member in enumerate(plan["cast"]):
@@ -183,7 +193,7 @@ def parser() -> argparse.ArgumentParser:
         if brief:
             sp.add_argument("brief", nargs="?", default="", help="what the clip is about")
             sp.add_argument("--plan", help="use this plan.json instead of writing one")
-        sp.add_argument("--aspect", choices=ASPECTS, default="9:16")
+        sp.add_argument("--aspect", choices=ASPECTS, help="9:16 (default) or 16:9; a --plan keeps its own")
         sp.add_argument("--template", action="store_true", help="skip the local model; use the template plan")
         sp.add_argument("--out", default="out", help="output folder (default: out)")
         sp.add_argument("--no-vo", action="store_true", help="no voice-over")
@@ -210,7 +220,7 @@ def main(argv=None) -> int:
     try:
         rc = handlers[a.cmd](a)
         return rc if isinstance(rc, int) else 0
-    except (RuntimeError, one.OneError, OSError, ValueError) as e:
+    except (RuntimeError, one.OneError, OSError, ValueError, subprocess.SubprocessError) as e:
         say(f"error: {e}")
         return 1
 
