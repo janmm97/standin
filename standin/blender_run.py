@@ -43,6 +43,7 @@ def render(plan: dict, out: Path, mode: str, scale: int | None = None, run=subpr
     blender = find_blender()
     if not blender:
         raise RuntimeError("Blender not found: install Blender 4.2+ or set STANDIN_BLENDER")
+    out = out.resolve()  # Blender resolves relative output paths against the drive root, not the cwd
     out.mkdir(parents=True, exist_ok=True)
     plan_path = out / "plan.json"
     plan_path.write_text(json.dumps(plan, indent=2), encoding="utf-8")
