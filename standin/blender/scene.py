@@ -67,10 +67,14 @@ def rest(j, f):
     key(j["hips"], "location", f, 0.95, 2)
 
 
-def act(action, j, s, e, home, other=None):
-    """Keyframe one beat (frames s..e) for one actor."""
+def act(action, j, s, e, home, other=None, first=True):
+    """Keyframe one beat (frames s..e) for one actor.
+
+    After the first beat the reset pose is keyed one frame late: frame s is the previous beat's last
+    frame (a keyframe image), and keying the reset there would replace its end pose with a rest pose.
+    """
     root = j["root"]
-    rest(j, s)
+    rest(j, s if first else s + 1)
     if action == "walk_in":
         key(root, "location", s, (home[0] - 3.0, home[1], 0))
         key(root, "location", e, (home[0], home[1], 0))
@@ -104,12 +108,13 @@ def act(action, j, s, e, home, other=None):
             key(j["torso"], "scale", f, (1, 1, 1.0 + 0.02 * (k % 2)))
 
 
-def camera(beat, s, e, target, rng):
+def camera(beat, s, e, target, rng, first=True):
     cam_obj = bpy.context.scene.camera
     rig = cam_obj.parent
     kind = beat["camera"]
-    key(rig, "rotation_euler", s, (0, 0, 0))
-    key(cam_obj, "location", s, (0, -4.6, 1.3))
+    at = s if first else s + 1  # same reason as in act(): keep the previous beat's end framing at s
+    key(rig, "rotation_euler", at, (0, 0, 0))
+    key(cam_obj, "location", at, (0, -4.6, 1.3))
     if kind == "dolly":
         key(cam_obj, "location", e, (0, -3.2, 1.3))
     elif kind == "orbit":
@@ -166,12 +171,12 @@ def build(plan, scale):
             home = (xs[k], 0)
             other = (xs[1 - k], 0) if len(actors) > 1 and k < 2 else None
             if b["action"] == "walk_in" and i > 0 and k != lead:
-                act("idle", j, s, e, home)
+                act("idle", j, s, e, home, first=i == 0)
             elif k == lead or b["action"] in ("hand_off", "walk_in"):
-                act(b["action"], j, s, e, home, other)
+                act(b["action"], j, s, e, home, other, first=i == 0)
             else:
-                act("idle", j, s, e, home)
-        camera(b, s, e, target, rng)
+                act("idle", j, s, e, home, first=i == 0)
+        camera(b, s, e, target, rng, first=i == 0)
         s = e
     sc.frame_start, sc.frame_end = 1, s
     return s
