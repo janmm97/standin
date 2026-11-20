@@ -45,3 +45,20 @@ def test_real_keyframes(tmp_path):
     keys = blender_run.render(plan, tmp_path, "keys", scale=10)
     assert [k.name for k in keys] == ["k_00.png", "k_01.png"]
     assert all(k.stat().st_size > 0 for k in keys)
+
+
+@pytest.mark.skipif(not blender_run.find_blender() or not os.path.exists(blender_run.find_blender() or ""),
+                    reason="Blender not installed")
+def test_beat_end_keyframe_keeps_the_end_pose(monkeypatch):
+    """The image pinned at a beat boundary must show that beat's last pose, not the next beat's reset."""
+    import subprocess
+    from pathlib import Path
+
+    monkeypatch.setenv("STANDIN_SCENE", str(blender_run.SCENE))
+    probe = Path(__file__).with_name("blender_probe.py")
+    p = subprocess.run([blender_run.find_blender(), "-b", "--factory-startup", "-P", str(probe)],
+                       capture_output=True, text=True, timeout=120)
+    rows = {int(r[1]): (float(r[2]), float(r[3])) for r in
+            (ln.split() for ln in p.stdout.splitlines() if ln.startswith("PROBE "))}
+    assert rows[97] == (-1.5, -3.2)  # end of the "point" beat: arm raised, dolly finished
+    assert rows[193] == (0.0, -4.6)
