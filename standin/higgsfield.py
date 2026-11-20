@@ -109,5 +109,7 @@ class Client:
 
 
 def _fetch(url: str, dest: Path) -> None:
+    if not url.startswith("https://"):
+        raise one.OneError(f"refusing non-https result URL: {url[:80]}")
     with urllib.request.urlopen(url, timeout=300) as r, open(dest, "wb") as f:  # noqa: S310 (https result URL)
         f.write(r.read())

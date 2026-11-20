@@ -127,3 +127,8 @@ def test_host_reports_undeleted_without_delete_cmd():
     h = Host(run=lambda c, **k: P(), env={"STANDIN_UPLOAD_CMD": "up {path}", "STANDIN_PUBLIC_BASE": "https://p"})
     h.upload(Path("a.png"))
     assert len(h.cleanup()) == 1
+
+
+def test_fetch_refuses_non_https(tmp_path):
+    with pytest.raises(higgsfield.one.OneError):
+        higgsfield._fetch("file:///etc/passwd", tmp_path / "x")
