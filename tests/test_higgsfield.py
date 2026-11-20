@@ -134,21 +134,26 @@ def test_fetch_refuses_non_https(tmp_path):
         higgsfield._fetch("file:///etc/passwd", tmp_path / "x")
 
 
-def test_one_execute_strips_quotes_when_one_is_a_cmd_shim(monkeypatch):
-    """cmd.exe re-parses a .cmd shim's args: a " inside a prompt must not reach it."""
-    monkeypatch.setattr(one.shutil, "which", lambda n: "C:/npm/one.CMD")
+def test_one_execute_bypasses_a_cmd_shim(monkeypatch, tmp_path):
+    """cmd.exe re-parses a .cmd shim's args, so & | % in a prompt could run commands: call node directly."""
+    js = tmp_path / "node_modules" / "@withone" / "cli" / "bin" / "cli.js"
+    js.parent.mkdir(parents=True)
+    js.write_text("")
+    (tmp_path / "node.exe").write_text("")
+    monkeypatch.setattr(one.shutil, "which", lambda n: str(tmp_path / "one.CMD"))
     seen = {}
 
     def run(cmd, **k):
         seen["cmd"] = cmd
         return P(0, "{}")
 
-    one.execute("p", "A", "K", {"prompt": 'say "hi" & del *', "n": 2, "l": ['a"b']}, run=run)
-    sent = json.loads(seen["cmd"][seen["cmd"].index("-d") + 1])
-    assert sent == {"prompt": "say 'hi' & del *", "n": 2, "l": ["a'b"]}
-    monkeypatch.setattr(one.shutil, "which", lambda n: "/usr/bin/one")  # a real binary gets the text as is
-    one.execute("p", "A", "K", {"prompt": 'say "hi"'}, run=run)
-    assert json.loads(seen["cmd"][seen["cmd"].index("-d") + 1]) == {"prompt": 'say "hi"'}
+    body = {"prompt": 'say "hi" & del * | %PATH%', "n": 2}
+    one.execute("p", "A", "K", body, run=run)
+    assert seen["cmd"][:2] == [str(tmp_path / "node.exe"), str(js)]
+    assert json.loads(seen["cmd"][seen["cmd"].index("-d") + 1]) == body  # text arrives unchanged
+    js.unlink()  # unknown shim layout: refuse rather than go through cmd.exe
+    with pytest.raises(one.OneError):
+        one.execute("p", "A", "K", body, run=run)
 
 
 def test_run_ignores_input_urls_echoed_in_the_result(tmp_path):
