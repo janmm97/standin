@@ -12,3 +12,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Higgsfield through the One CLI: Soul cast stills, Nano Banana actor insertion into keyframes, Veo 3.1 first/last-frame segments, status polling with timeouts, a tolerant result-URL reader and a cost estimate. Keyframes get a short-lived public URL through your own upload/delete command (for example wrangler + R2) and are deleted afterwards.
 - Local voice-over: Orpheus TTS through LM Studio, decoded with SNAC to 24 kHz WAV (optional `voice` extra), one line per beat fitted to the beat's length.
 - Final edit with ffmpeg: joins the segments, adds the voice-over, burns ~3-word captions timed to each beat's spoken line, and stamps an "AI-generated" label.
+- `standin` CLI: `models`, `doctor`, `plan`, `preview` (free, local), `make` (paid; prints a cost estimate and needs `--yes`), `batch` (CSV of briefs).
+
+### Fixed
+- Blender output paths are made absolute, so a relative `--out` no longer writes to the drive root.
