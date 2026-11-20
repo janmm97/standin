@@ -28,7 +28,7 @@ def test_speak_and_voice_over(tmp_path):
 
     def post(url, body):
         seen.append((url, body))
-        return {"choices": [{"text": tok(list(range(7)) * 2)}]}
+        return {"choices": [{"text": tok(list(range(1, 8)) * 2)}]}
 
     pcm_per_line = b"\x01\x00" * voice.RATE  # 1 s of audio
     plan = template_plan("oat milk")

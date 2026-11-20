@@ -126,6 +126,14 @@ def preview(a) -> Path:
     return out
 
 
+def paid(client, model: str, body: dict, dest: Path) -> Path:
+    """A finished output from an earlier run is reused, so a rerun after a crash doesn't pay twice."""
+    if dest.exists():
+        say(f"reusing {dest.relative_to(dest.parent.parent)} (delete it to regenerate)")
+        return dest
+    return client.run(model, body, dest)
+
+
 def make(a) -> Path | None:
     plan = get_plan(a)
     d = workdir(a, plan)
@@ -142,20 +150,21 @@ def make(a) -> Path | None:
         cast_urls = []
         for i, member in enumerate(plan["cast"]):
             say(f"higgsfield: casting {member['name']}...")
-            img = client.run("soul", higgsfield.soul_body(member, plan["aspect"]), d / "cast" / f"c_{i}.png")
+            body = higgsfield.soul_body(member, plan["aspect"])
+            img = paid(client, "soul", body, d / "cast" / f"c_{i}.png")
             cast_urls.append(host.upload(img))
         shots = []
         for i, k in enumerate(keys):
             say(f"higgsfield: keyframe {i + 1}/{len(keys)}...")
             scene = plan["beats"][min(i, len(plan["beats"]) - 1)]["scene"]
             body = higgsfield.insert_body(host.upload(k), cast_urls, scene, plan["aspect"])
-            shots.append(host.upload(client.run("nano_banana", body, d / "shots" / f"s_{i:02}.png")))
+            shots.append(host.upload(paid(client, "nano_banana", body, d / "shots" / f"s_{i:02}.png")))
         segs = []
         for i, b in enumerate(plan["beats"]):
             say(f"higgsfield: segment {i + 1}/{len(plan['beats'])}...")
             body = higgsfield.veo_body(shots[i], shots[i + 1], b["scene"], b["duration"], plan["aspect"])
             model = "veo_fast" if a.draft else "veo"
-            segs.append(client.run(model, body, d / "segments" / f"seg_{i:02}.mp4"))
+            segs.append(paid(client, model, body, d / "segments" / f"seg_{i:02}.mp4"))
     finally:
         if left := host.cleanup():
             say(f"warning: could not delete {len(left)} hosted file(s): {', '.join(left)}")
@@ -173,6 +182,7 @@ def cmd_batch(a) -> int:
     for n, row in enumerate(rows, 1):
         say(f"\n[{n}/{len(rows)}] {row['brief'][:60]}")
         sub = argparse.Namespace(**{**vars(a), "brief": row["brief"], "plan": None,
+                                    "out": str(Path(a.out) / f"row-{n:02}"),  # briefs can share a slug
                                     "aspect": row.get("aspect") or a.aspect})
         try:
             (make if a.make else preview)(sub)

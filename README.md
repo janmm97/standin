@@ -100,7 +100,8 @@ On a 4 GB GPU the local plan is the slowest step. Use `--template` or edit a pla
 - The mannequins are crude on purpose (no elbows or knees). They're a pose and camera reference, not final art, and feet can slide in walk-ins.
 - How closely the actors follow your blocking depends on Higgsfield's models. Keyframes pin the start and end of every beat; the motion in between is Veo's.
 - The Higgsfield path hasn't been run against paid endpoints yet. The `input_images` item shape for Nano Banana is a best guess from incomplete docs (see `standin/higgsfield.py`). Please open an issue if a call fails.
-- The voice path is tested with fixtures only so far.
+- The voice path is tested with fixtures only so far: the Orpheus prompt format and the SNAC decode haven't been checked against a real model.
+- The "will it fit" model check reads `lms load --estimate-only` output with a heuristic that hasn't been checked on many machines.
 - Every output carries an "AI-generated" label. Don't use it to impersonate real people.
 
 ## Prior art

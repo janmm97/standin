@@ -6,6 +6,7 @@ Needs an Orpheus GGUF in LM Studio (e.g. `orpheus-3b-0.1-ft`) and `pip install s
 from __future__ import annotations
 
 import re
+import sys
 import wave
 from pathlib import Path
 
@@ -25,7 +26,7 @@ def parse_tokens(text: str) -> list[int]:
     ids = []
     for m in TOKEN.finditer(text):
         i = int(m.group(1)) - 10 - (len(ids) % 7) * 4096
-        if 0 <= i < 4096:
+        if 0 < i < 4096:  # as in the Orpheus reference decoder
             ids.append(i)
     return ids[: len(ids) // 7 * 7]
 
@@ -86,6 +87,10 @@ def voice_over(plan: dict, model: str, out: Path, post=None, decoder=None) -> tu
     pcm, spoken = b"", []
     for b in plan["beats"]:
         line = speak(b["vo"], plan["voice"], model, post, decoder) if b["vo"] else b""
-        spoken.append(min(len(line) / 2 / RATE, b["duration"]))
+        said = len(line) / 2 / RATE
+        if said > b["duration"] + 0.1:
+            print(f"warning: voice line runs {said:.1f}s in a {b['duration']}s beat and is cut;"
+                  " shorten the line or lengthen the beat", file=sys.stderr)
+        spoken.append(min(said, b["duration"]))
         pcm += fit(line, b["duration"])
     return write_wav(out, pcm), spoken

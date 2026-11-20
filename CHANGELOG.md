@@ -14,5 +14,9 @@ All notable changes to this project are documented here. The format follows [Kee
 - Final edit with ffmpeg: joins the segments, adds the voice-over, burns ~3-word captions timed to each beat's spoken line, and stamps an "AI-generated" label.
 - `standin` CLI: `models`, `doctor`, `plan`, `preview` (free, local), `make` (paid; prints a cost estimate and needs `--yes`), `batch` (CSV of briefs).
 
+### Known limits
+- Not yet run with paid Higgsfield calls: the result-URL and `input_images` shapes are unverified.
+- The Orpheus prompt, the SNAC decode and the model-fit heuristic are tested with fixtures only.
+
 ### Fixed
 - Blender output paths are made absolute, so a relative `--out` no longer writes to the drive root.

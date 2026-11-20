@@ -64,14 +64,18 @@ def _duration(value) -> int:
     return min(DURATIONS, key=lambda d: abs(d - n))
 
 
+def _list(x) -> list:
+    return x if isinstance(x, list) else []
+
+
 def normalize(raw: dict, aspect: str = "9:16") -> dict:
     """Clamp anything a small model gets wrong into a plan the renderer can use."""
     cast = [
         {"name": str(c.get("name") or f"Actor {i + 1}")[:40], "look": str(c.get("look") or "")[:300]}
-        for i, c in enumerate((raw.get("cast") or [])[:3]) if isinstance(c, dict)
+        for i, c in enumerate(_list(raw.get("cast"))[:3]) if isinstance(c, dict)
     ] or [{"name": "Host", "look": "friendly presenter in casual clothes"}]
     beats = []
-    for b in (raw.get("beats") or [])[:MAX_BEATS]:
+    for b in _list(raw.get("beats"))[:MAX_BEATS]:
         if not isinstance(b, dict):
             continue
         beats.append({
