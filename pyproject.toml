@@ -14,7 +14,7 @@ dependencies = []
 
 [project.optional-dependencies]
 voice = ["snac>=1.2", "torch>=2.2", "numpy>=1.26"]
-captions = ["faster-whisper>=1.0"]
+captions = ["faster-whisper>=1.2.1"]
 dev = ["pytest>=8", "ruff>=0.6"]
 
 [project.scripts]
