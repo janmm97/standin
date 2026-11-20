@@ -13,7 +13,7 @@ authors = [{ name = "Jan (janmm97)" }]
 dependencies = []
 
 [project.optional-dependencies]
-voice = ["snac>=1.2", "torch>=2.2", "numpy>=1.26"]
+voice = ["snac>=1.2", "torch>=2.15.0", "numpy>=1.26"]
 dev = ["pytest>=8", "ruff>=0.6"]
 
 [project.scripts]
