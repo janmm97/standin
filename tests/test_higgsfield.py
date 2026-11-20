@@ -132,3 +132,71 @@ def test_host_reports_undeleted_without_delete_cmd():
 def test_fetch_refuses_non_https(tmp_path):
     with pytest.raises(higgsfield.one.OneError):
         higgsfield._fetch("file:///etc/passwd", tmp_path / "x")
+
+
+def test_one_execute_bypasses_a_cmd_shim(monkeypatch, tmp_path):
+    """cmd.exe re-parses a .cmd shim's args, so & | % in a prompt could run commands: call node directly."""
+    js = tmp_path / "node_modules" / "@withone" / "cli" / "bin" / "cli.js"
+    js.parent.mkdir(parents=True)
+    js.write_text("")
+    (tmp_path / "node.exe").write_text("")
+    monkeypatch.setattr(one.shutil, "which", lambda n: str(tmp_path / "one.CMD"))
+    seen = {}
+
+    def run(cmd, **k):
+        seen["cmd"] = cmd
+        return P(0, "{}")
+
+    body = {"prompt": 'say "hi" & del * | %PATH%', "n": 2}
+    one.execute("p", "A", "K", body, run=run)
+    assert seen["cmd"][:2] == [str(tmp_path / "node.exe"), str(js)]
+    assert json.loads(seen["cmd"][seen["cmd"].index("-d") + 1]) == body  # text arrives unchanged
+    js.unlink()  # unknown shim layout: refuse rather than go through cmd.exe
+    with pytest.raises(one.OneError):
+        one.execute("p", "A", "K", body, run=run)
+
+
+def test_run_ignores_input_urls_echoed_in_the_result(tmp_path):
+    ex, _ = fake_execute([{"status": "completed", "input": {"first_frame_url": "https://h/s_00.png"},
+                           "video": {"url": "https://cdn/out.mp4"}}])
+    c = higgsfield.Client("k", execute=ex, sleep=lambda s: None)
+    got = {}
+    c.run("veo", {"first_frame_url": "https://h/s_00.png"}, tmp_path / "a.mp4",
+          fetch=lambda u, d: got.update(u=u))
+    assert got["u"] == "https://cdn/out.mp4"
+
+
+def test_wait_survives_a_flaky_poll_but_not_a_dead_one():
+    calls = []
+
+    def ex(platform, action, key, data=None, path_vars=None):
+        calls.append(1)
+        if len(calls) in (1, 2):
+            raise one.OneError("503")
+        return {"status": "completed", "url": "https://cdn/o.png"}
+
+    c = higgsfield.Client("k", execute=ex, sleep=lambda s: None)
+    assert c.wait("r") == ["https://cdn/o.png"]
+
+    def dead(*a, **k):
+        raise one.OneError("401")
+
+    with pytest.raises(one.OneError, match="401"):
+        higgsfield.Client("k", execute=dead, sleep=lambda s: None).wait("r")
+
+
+def test_redirect_to_http_is_refused():
+    h = higgsfield._HttpsOnly()
+    req = higgsfield.urllib.request.Request("https://cdn/o.png")
+    with pytest.raises(higgsfield.urllib.error.URLError, match="non-https"):
+        h.redirect_request(req, None, 302, "Found", {}, "http://evil/o.png")
+
+
+def test_host_split_drops_windows_quotes_and_keeps_other_braces():
+    from standin import host as hostmod
+
+    assert hostmod.split('up --file "{path}" -x \'a b\'', nt=True) == ["up", "--file", "{path}", "-x", "a b"]
+    assert hostmod.split('up --file "{path}"', nt=False) == ["up", "--file", "{path}"]
+    env = {"STANDIN_UPLOAD_CMD": 'up {path} \'{"k":"{key}"}\'', "STANDIN_PUBLIC_BASE": "https://p"}
+    h = Host(run=lambda c, **k: P(), env=env)
+    assert h._cmd(h.up, path="/a b/x.png", key="K")[1:] == ["/a b/x.png", '{"k":"K"}']
