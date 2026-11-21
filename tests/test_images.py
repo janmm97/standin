@@ -155,7 +155,8 @@ def test_post_reports_the_api_error_body(monkeypatch):
     import urllib.error
 
     def boom(req, timeout):
-        raise urllib.error.HTTPError(req.full_url, 400, "Bad Request", {}, io.BytesIO(b'{"error":"bad size"}'))
+        body = io.BytesIO(b'{"error":"bad size"}')
+        raise urllib.error.HTTPError(req.full_url, 400, "Bad Request", {}, body)
 
     monkeypatch.setattr(images.urllib.request, "urlopen", boom)
     with pytest.raises(RuntimeError, match=r"HTTP 400.*bad size"):
