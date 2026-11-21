@@ -157,8 +157,8 @@ def make(a) -> Path | None:
         for i, k in enumerate(keys):
             say(f"higgsfield: keyframe {i + 1}/{len(keys)}...")
             beat = plan["beats"][i // 2]  # keys come in (first, last) pairs per beat
-            body = higgsfield.insert_body(host.upload(k), cast_urls, direction.still_prompt(plan, beat),
-                                          plan["aspect"])
+            prompt = direction.still_prompt(plan, beat, end=i % 2)
+            body = higgsfield.insert_body(host.upload(k), cast_urls, prompt, plan["aspect"])
             shots.append(host.upload(paid(client, "nano_banana", body, d / "shots" / f"s_{i:02}.png")))
         segs = []
         for i, b in enumerate(plan["beats"]):
