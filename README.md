@@ -63,6 +63,25 @@ Generic prompts give generic AI images. standin writes every prompt the way a di
 
 The look is only as good as the plan. A capable local model writes a usable one. The `--template` plan is a fallback: its only line is your brief, and its location is generic. For a real ad, write `location`, `look`, `scene` and `vo` in `plan.json` yourself (or have any chat assistant write the plan against the schema in `standin/plan.py`), then run `preview` again before `make`.
 
+## Image providers
+
+The cast stills and keyframes can come from an image generator you already pay for, instead of Higgsfield. `make` picks one automatically, in this order:
+
+| Provider | Used when | Cost to you |
+|---|---|---|
+| `codex` | the [Codex CLI](https://github.com/openai/codex) is installed and `codex login status` passes (sign in with ChatGPT) | included in your ChatGPT plan's limits |
+| `gemini` | `GEMINI_API_KEY` or `GOOGLE_API_KEY` is set | billed to your Google key |
+| `openai` | `OPENAI_API_KEY` is set | billed to your OpenAI key |
+| `higgsfield` | none of the above | Soul + Nano Banana, in the estimate |
+| `agent` | only when you choose it | whatever your assistant costs |
+
+Choose one with `--images codex|gemini|openai|agent|higgsfield` or `STANDIN_IMAGES`. `standin doctor` shows which one it will use. `make` prints the provider before the estimate, and the estimate drops the image cost when the images don't come from Higgsfield (the template plan goes from $1.66 to $1.40).
+
+- **codex** runs `codex exec` read-only (`--sandbox read-only`) and copies the image Codex saves in `~/.codex/generated_images` (or `CODEX_HOME`). It took 42–45 s per image on our test machine.
+- **agent** is for any assistant that can make images (ChatGPT, Gemini, Claude with an image tool, a local diffusion setup). `make --images agent --yes` writes `image_requests.json` with the prompt, aspect, reference images and output path of each image, then stops. Make the images, save each to its `output` path, and run the same command again: standin reuses files that already exist and goes on to the video.
+- **Video (Veo 3.1) stays on Higgsfield**, so `make` still needs the Higgsfield connection and keyframe hosting.
+- The `gemini` (`gemini-2.5-flash-image`, set with `STANDIN_GEMINI_IMAGE_MODEL`) and `openai` (`gpt-image-1`, set with `STANDIN_OPENAI_IMAGE_MODEL`) paths follow the public APIs and are unit-tested, but haven't been run against the live APIs yet. Reports welcome.
+
 ## Picking the local model
 
 `standin models` reads `lms ls --json`. It ignores embedding models and voice (Orpheus) models, sorts the chat models by parameter count, and asks LM Studio (`lms load <model> --estimate-only`) whether each one fits your machine. The biggest one that fits writes the plan. Set `STANDIN_CHAT_MODEL` to choose one yourself.
@@ -90,7 +109,7 @@ Any tool works: `{path}` is the local file and `{key}` is a random object name. 
 
 ## Cost
 
-`make` always prints an estimate first and needs `--yes` before it spends anything. With rough 2026-11 prices, the 3-beat template plan (1 actor, 14 s) comes to about $1.66 on Veo 3.1 Fast. A 4-beat, 2-actor, 22 s plan comes to about $9 on Veo 3.1. Check Higgsfield's current pricing.
+`make` always prints an estimate first and needs `--yes` before it spends anything. With rough 2026-11 prices, the 3-beat template plan (1 actor, 14 s) comes to about $1.66 on Veo 3.1 Fast. A 4-beat, 2-actor, 22 s plan comes to about $9 on Veo 3.1. If the images come from Codex, Gemini, OpenAI or your own assistant (see [Image providers](#image-providers)), only the Veo part is charged by Higgsfield ($1.40 for the template plan). Check Higgsfield's current pricing.
 
 ## Measured on a laptop
 
