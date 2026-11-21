@@ -37,13 +37,18 @@ def look(plan: dict) -> str:
     return plan.get("look") or DEFAULT_LOOK
 
 
-def still_prompt(plan: dict, beat: dict) -> str:
-    """One keyframe: framing, lens, angle, world, action and look, then what to avoid."""
+MOMENT = {0: "the opening moment of the shot", 1: "the closing moment of the shot, the action completed"}
+
+
+def still_prompt(plan: dict, beat: dict, end: int | None = None) -> str:
+    """One keyframe: framing, lens, angle, world, action and look, then what to avoid.
+    end 0/1 says whether this is the shot's first or last frame, so the pair differs."""
     shot = beat.get("shot", "medium")
     lens = LENS.get(shot, 35)
     return _sentence(
         f"Cinematic film still, {SHOT_TEXT.get(shot, SHOT_TEXT['medium'])}, "
         f"{ANGLE_TEXT.get(beat.get('angle'), 'eye-level')}",
+        MOMENT.get(end, ""),
         f"Location: {plan['location']}" if plan.get("location") else "",
         beat.get("scene", ""),
         f"Look: {look(plan)}",

@@ -14,6 +14,8 @@ def test_still_prompt_carries_shot_lens_location_look_and_avoid():
     for part in ("extreme close-up", "high angle", "corner cafe at 7am", "hand on the cup",
                  "cold window key", "85mm prime", "Avoid:", "mannequins"):
         assert part in s
+    first, last = (direction.still_prompt(plan, {"shot": "wide"}, end=e) for e in (0, 1))
+    assert "opening moment" in first and "action completed" in last
 
 
 def test_motion_prompt_names_the_move_and_keeps_continuity():

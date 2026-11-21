@@ -79,6 +79,7 @@ Choose one with `--images codex|gemini|openai|agent|higgsfield` or `STANDIN_IMAG
 
 - **codex** runs `codex exec` read-only (`--sandbox read-only`) and copies the image Codex saves in `~/.codex/generated_images` (or `CODEX_HOME`). It took 42–45 s per image on our test machine.
 - **agent** is for any assistant that can make images (ChatGPT, Gemini, Claude with an image tool, a local diffusion setup). `make --images agent --yes` writes `image_requests.json` with the prompt, aspect, reference images and output path of each image, then stops. Make the images, save each to its `output` path, and run the same command again: standin reuses files that already exist and goes on to the video.
+- Stills that already exist are reused, even if an earlier run made them with another provider. Delete `cast/` and `shots/` when you switch providers, so the look stays consistent.
 - **Video (Veo 3.1) stays on Higgsfield**, so `make` still needs the Higgsfield connection and keyframe hosting.
 - The `gemini` (`gemini-2.5-flash-image`, set with `STANDIN_GEMINI_IMAGE_MODEL`) and `openai` (`gpt-image-1`, set with `STANDIN_OPENAI_IMAGE_MODEL`) paths follow the public APIs and are unit-tested, but haven't been run against the live APIs yet. Reports welcome.
 

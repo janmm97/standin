@@ -171,7 +171,7 @@ def make(a) -> Path | None:
         for i, k in enumerate(keys):
             say(f"{source}: keyframe {i + 1}/{len(keys)}...")
             beat = plan["beats"][i // 2]  # keys come in (first, last) pairs per beat
-            prompt = higgsfield.pose_prompt(len(cast), direction.still_prompt(plan, beat))
+            prompt = higgsfield.pose_prompt(len(cast), direction.still_prompt(plan, beat, end=i % 2))
             dest = d / "shots" / f"s_{i:02}.png"
             stills.append(picture(gen, prompt, [Path(k), *cast], plan["aspect"], dest))
         if isinstance(gen, images.Agent) and gen.requests:
