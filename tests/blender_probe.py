@@ -8,7 +8,7 @@ plan = {"aspect": "9:16", "cast": [{"name": "a", "look": "x"}],
         "beats": [{**beat, "action": "point", "camera": "dolly"}, {**beat, "action": "idle"}]}
 ns["build"](plan, 10)
 bpy = ns["bpy"]
-for f in (97, 193):
+for f in (97, 98, 193):
     bpy.context.scene.frame_set(f)
     arm = bpy.data.objects["actor0_sh_r"].rotation_euler[0]
     cam = bpy.data.objects["camera"].location[1]

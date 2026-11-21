@@ -60,5 +60,7 @@ def test_beat_end_keyframe_keeps_the_end_pose(monkeypatch):
                        capture_output=True, text=True, timeout=120)
     rows = {int(r[1]): (float(r[2]), float(r[3])) for r in
             (ln.split() for ln in p.stdout.splitlines() if ln.startswith("PROBE "))}
-    assert rows[97] == (-1.5, -3.2)  # end of the "point" beat: arm raised, dolly finished
-    assert rows[193] == (0.0, -4.6)
+    # medium shot on a 35 mm lens: 1.26 m away; the dolly ends at 80 %
+    assert rows[97] == (-1.5, -1.01)  # end of the "point" beat: arm raised, dolly finished
+    assert rows[98] == (0.0, -1.26)  # the cut: the next beat opens on its own pose and framing
+    assert rows[193] == (0.0, -1.26)

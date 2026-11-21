@@ -5,7 +5,7 @@ from standin.plan import normalize
 
 
 def test_make_reuses_finished_outputs(tmp_path, monkeypatch):
-    monkeypatch.setattr(cli.blender_run, "render", lambda plan, d, mode: [d / "k.png"] * 4)
+    monkeypatch.setattr(cli.blender_run, "render", lambda plan, d, mode: [d / "k.png"] * 6)
     done = tmp_path / "x" / "segments" / "seg_00.mp4"
     done.parent.mkdir(parents=True)
     done.write_bytes(b"paid earlier")

@@ -30,12 +30,12 @@ def test_make_without_yes_spends_nothing(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(cli.blender_run, "render", boom)
     assert cli.main(["make", "x", "--template", "--out", str(tmp_path)]) == 0
     out = capsys.readouterr().out
-    assert "'total': 1.58" in out and "no paid calls made" in out
+    assert "'total': 1.66" in out and "no paid calls made" in out
 
 
 def test_make_with_yes_runs_pipeline_and_cleans_up(tmp_path, monkeypatch):
     monkeypatch.setattr(cli.blender_run, "render",
-                        lambda plan, d, mode: [d / "keys" / f"k_{i:02}.png" for i in range(4)])
+                        lambda plan, d, mode: [d / "keys" / f"k_{i:02}.png" for i in range(6)])
     runs = []
 
     class FakeClient:
@@ -58,14 +58,15 @@ def test_make_with_yes_runs_pipeline_and_cleans_up(tmp_path, monkeypatch):
     monkeypatch.setattr(cli.edit, "concat", lambda segs, out: out)
     monkeypatch.setattr(cli.edit, "finish", lambda v, out, wav, srt: out)
     assert cli.main(["make", "x", "--template", "--yes", "--no-vo", "--out", str(tmp_path)]) == 0
-    assert [m for m, _ in runs] == ["soul"] + ["nano_banana"] * 4 + ["veo_fast"] * 3
-    first_veo = runs[5][1]
-    assert (first_veo["first_frame_url"], first_veo["last_frame_url"]) == ("https://h/s_00.png", "https://h/s_01.png")
+    assert [m for m, _ in runs] == ["soul"] + ["nano_banana"] * 6 + ["veo_fast"] * 3
+    veos = [b for m, b in runs if m == "veo_fast"]
+    assert [(v["first_frame_url"], v["last_frame_url"]) for v in veos] == [
+        (f"https://h/s_{2 * i:02}.png", f"https://h/s_{2 * i + 1:02}.png") for i in range(3)]
     assert FakeHost.cleaned and (tmp_path / "x" / "captions.srt").exists()
 
 
 def test_make_cleans_up_on_failure(tmp_path, monkeypatch):
-    monkeypatch.setattr(cli.blender_run, "render", lambda plan, d, mode: [d / "k.png"] * 4)
+    monkeypatch.setattr(cli.blender_run, "render", lambda plan, d, mode: [d / "k.png"] * 6)
 
     class FailClient:
         def run(self, *a):
@@ -122,7 +123,7 @@ def test_make_refuses_to_spend_when_keyframe_count_is_wrong(tmp_path, monkeypatc
     monkeypatch.setattr(cli.higgsfield, "Client", FakeClient)
     monkeypatch.setattr(cli, "Host", lambda: object())
     assert cli.main(["make", "x", "--template", "--yes", "--out", str(tmp_path)]) == 1
-    assert not ran and "expected 4" in capsys.readouterr().out
+    assert not ran and "expected 6" in capsys.readouterr().out
 
 
 def test_timeouts_are_reported_not_a_traceback(monkeypatch, capsys):

@@ -32,12 +32,14 @@ def test_template_plan_is_valid():
     p = template_plan("New  running shoe", "16:9")
     assert p["aspect"] == "16:9" and len(p["beats"]) == 3
     assert "New running shoe" in p["beats"][1]["scene"]
+    assert [b["shot"] for b in p["beats"]] == ["wide", "detail", "close"]
+    assert p["location"] and p["look"]
 
 
 def test_keyframes_and_length():
     p = template_plan("x")
     assert total_seconds(p) == 14
-    assert keyframe_frames(p) == [1, 97, 241, 337]
+    assert keyframe_frames(p) == [1, 97, 98, 241, 242, 337]  # a cut between beats: 2 per beat
 
 
 def test_make_plan_uses_model():
