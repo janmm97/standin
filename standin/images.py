@@ -13,6 +13,8 @@ import os
 import re
 import shutil
 import subprocess
+import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 from pathlib import Path
@@ -86,8 +88,12 @@ class Codex:
 
 def _post(url: str, data: bytes, headers: dict) -> dict:
     req = urllib.request.Request(url, data, headers)
-    with urllib.request.urlopen(req, timeout=300) as r:  # noqa: S310 (fixed https API URLs)
-        return json.loads(r.read())
+    try:
+        with urllib.request.urlopen(req, timeout=300) as r:  # noqa: S310 (fixed https API URLs)
+            return json.loads(r.read())
+    except urllib.error.HTTPError as e:  # the body says why (bad key, quota, unsupported size)
+        raise RuntimeError(f"HTTP {e.code} from {urllib.parse.urlsplit(url).netloc}: "
+                           f"{e.read().decode('utf-8', 'replace')[:300]}") from None
 
 
 def _save(b64: str, dest: Path) -> Path:
@@ -101,6 +107,8 @@ class Gemini:
 
     def __init__(self, env=os.environ, post=_post):
         self.key = env.get("GEMINI_API_KEY") or env.get("GOOGLE_API_KEY")
+        if not self.key:
+            raise RuntimeError("--images gemini needs GEMINI_API_KEY (or GOOGLE_API_KEY) in the environment")
         self.model = env.get("STANDIN_GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image")
         self.post = post
 
@@ -127,6 +135,8 @@ class OpenAI:
 
     def __init__(self, env=os.environ, post=_post):
         self.key = env.get("OPENAI_API_KEY")
+        if not self.key:
+            raise RuntimeError("--images openai needs OPENAI_API_KEY in the environment")
         self.model = env.get("STANDIN_OPENAI_IMAGE_MODEL", "gpt-image-1")
         self.post = post
 

@@ -142,3 +142,22 @@ def test_make_with_agent_writes_requests_and_spends_nothing(tmp_path, monkeypatc
     assert len(req) == 7 and req[0]["references"] == [] and req[0]["output"].endswith("c_0.png")
     assert req[1]["references"][1] == req[0]["output"]  # each keyframe uses the cast still made first
     assert "mannequin 1 becomes the person in reference image 2" in req[1]["prompt"]
+
+
+@pytest.mark.parametrize("cls", [images.Gemini, images.OpenAI])
+def test_api_providers_fail_early_without_a_key(cls):
+    with pytest.raises(RuntimeError, match="_API_KEY"):
+        cls(env={})
+
+
+def test_post_reports_the_api_error_body(monkeypatch):
+    import io
+    import urllib.error
+
+    def boom(req, timeout):
+        body = io.BytesIO(b'{"error":"bad size"}')
+        raise urllib.error.HTTPError(req.full_url, 400, "Bad Request", {}, body)
+
+    monkeypatch.setattr(images.urllib.request, "urlopen", boom)
+    with pytest.raises(RuntimeError, match=r"HTTP 400.*bad size"):
+        images._post("https://example.test/x", b"{}", {})
