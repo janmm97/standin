@@ -11,6 +11,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - The template plan is wide, then a detail insert, then a close-up. Only the middle beat speaks.
 
 ### Added
+- Image providers: the cast stills and keyframes come from the image generator you already have. In auto order: the Codex CLI signed in with ChatGPT, then a Gemini key, then an OpenAI key, then Higgsfield. `--images agent` writes `image_requests.json` for any assistant to fill in. Choose with `--images` or `STANDIN_IMAGES`; `doctor` shows the pick. Video stays on Higgsfield.
 - Project scaffold: MIT licence, contributing guide, code of conduct, security policy, templates and CI.
 - Local model discovery: reads `lms ls --json`, picks the largest chat model LM Studio says will fit (`lms load --estimate-only`), skips embedding and voice (Orpheus) models, and starts the server and loads it.
 - Shot plan: a local model writes a JSON plan (cast, beats, actions, camera, voice-over) using a strict schema with thinking turned off; any bad value is clamped, and a template plan is used when no model is available.

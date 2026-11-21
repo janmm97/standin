@@ -18,10 +18,12 @@ def test_estimate_draft_and_final():
     assert higgsfield.estimate(plan, draft=True) == {
         "soul": 0.02, "nano_banana": 0.24, "veo": 1.4, "total": 1.66}
     assert higgsfield.estimate(plan, draft=False)["veo"] == 5.6
+    assert higgsfield.estimate(plan, images=False) == {"soul": 0, "nano_banana": 0, "veo": 1.4, "total": 1.4}
 
 
 def test_bodies():
-    b = higgsfield.insert_body("https://h/k0.png", ["https://h/a.png", "https://h/b.png"], "cafe", "9:16")
+    b = higgsfield.insert_body("https://h/k0.png", ["https://h/a.png", "https://h/b.png"],
+                              higgsfield.pose_prompt(2, "cafe"), "9:16")
     assert [i["image_url"] for i in b["input_images"]] == ["https://h/k0.png", "https://h/a.png", "https://h/b.png"]
     assert "reference image 3" in b["prompt"] and b["aspect_ratio"] == "9:16"
     v = higgsfield.veo_body("https://a", "https://b", "walks", 6, "9:16")

@@ -12,7 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import blender_run, direction, edit, higgsfield, models, one, voice
+from . import blender_run, direction, edit, higgsfield, images, models, one, voice
 from .host import Host
 from .plan import ASPECTS, make_plan, normalize, template_plan
 
@@ -94,12 +94,17 @@ def cmd_doctor(a) -> int:
         host = True
     except RuntimeError:
         host = False
+    try:
+        source = images.resolve(None)
+    except ValueError as e:
+        source = str(e)
     checks = [
         ("LM Studio CLI (lms)", shutil.which("lms"), "install LM Studio and run `lms bootstrap`"),
         ("Blender", blender_run.find_blender(), "install Blender 4.2+ or set STANDIN_BLENDER"),
         ("ffmpeg", blender_run.find_ffmpeg(), "install ffmpeg or set STANDIN_FFMPEG"),
         ("One CLI", has_one, "npm i -g @withone/cli, then `one init`"),
         ("Higgsfield in One", hf, "`one add higgsfield-ai` (paid steps only)"),
+        (f"Images: {source}", True, ""),
         ("Keyframe hosting", host, "set STANDIN_UPLOAD_CMD and STANDIN_PUBLIC_BASE (paid steps only)"),
         ("voice extra", importlib.util.find_spec("snac"), "pip install 'standin[voice]'"),
     ]
@@ -126,40 +131,56 @@ def preview(a) -> Path:
     return out
 
 
-def paid(client, model: str, body: dict, dest: Path) -> Path:
+def reuse(dest: Path) -> bool:
     """A finished output from an earlier run is reused, so a rerun after a crash doesn't pay twice."""
     if dest.exists():
         say(f"reusing {dest.relative_to(dest.parent.parent)} (delete it to regenerate)")
-        return dest
-    return client.run(model, body, dest)
+    return dest.exists()
+
+
+def paid(client, model: str, body: dict, dest: Path) -> Path:
+    return dest if reuse(dest) else client.run(model, body, dest)
+
+
+def picture(gen, prompt: str, refs: list[Path], aspect: str, dest: Path) -> Path:
+    return dest if reuse(dest) else gen.image(prompt, refs, aspect, dest)
 
 
 def make(a) -> Path | None:
     plan = get_plan(a)
     d = workdir(a, plan)
-    cost = higgsfield.estimate(plan, a.draft)
-    say(f"estimate (USD, rough): {cost}  [{'Veo 3.1 Fast' if a.draft else 'Veo 3.1'}]")
+    source = images.resolve(a.images)
+    cost = higgsfield.estimate(plan, a.draft, images=source == "higgsfield")
+    say(f"images: {source} - {images.NOTE[source]}")
+    say(f"Higgsfield estimate (USD, rough): {cost}  [{'Veo 3.1 Fast' if a.draft else 'Veo 3.1'}]")
     if not a.yes:
         say(f"no paid calls made. Check {d / 'plan.json'}, then add --yes to generate.")
         return None
     client, host = higgsfield.Client(), Host()  # fail on missing setup before the slow render
+    gen = images.make(source, client, host)
     keys = blender_run.render(plan, d, "keys")
     if len(keys) != 2 * len(plan["beats"]):  # a first and last frame per beat; check before spending
         raise RuntimeError(f"Blender wrote {len(keys)} keyframes, expected {2 * len(plan['beats'])}")
     try:
-        cast_urls = []
+        cast = []
         for i, member in enumerate(plan["cast"]):
-            say(f"higgsfield: casting {member['name']}...")
-            body = higgsfield.soul_body(direction.cast_prompt(plan, member), plan["aspect"])
-            img = paid(client, "soul", body, d / "cast" / f"c_{i}.png")
-            cast_urls.append(host.upload(img))
-        shots = []
+            say(f"{source}: casting {member['name']}...")
+            cast.append(picture(gen, direction.cast_prompt(plan, member), [], plan["aspect"],
+                                d / "cast" / f"c_{i}.png"))
+        stills = []
         for i, k in enumerate(keys):
-            say(f"higgsfield: keyframe {i + 1}/{len(keys)}...")
+            say(f"{source}: keyframe {i + 1}/{len(keys)}...")
             beat = plan["beats"][i // 2]  # keys come in (first, last) pairs per beat
-            prompt = direction.still_prompt(plan, beat, end=i % 2)
-            body = higgsfield.insert_body(host.upload(k), cast_urls, prompt, plan["aspect"])
-            shots.append(host.upload(paid(client, "nano_banana", body, d / "shots" / f"s_{i:02}.png")))
+            prompt = higgsfield.pose_prompt(len(cast), direction.still_prompt(plan, beat, end=i % 2))
+            dest = d / "shots" / f"s_{i:02}.png"
+            stills.append(picture(gen, prompt, [Path(k), *cast], plan["aspect"], dest))
+        if isinstance(gen, images.Agent) and gen.requests:
+            req = d / "image_requests.json"
+            req.write_text(json.dumps(gen.requests, indent=2), encoding="utf-8")
+            say(f"{len(gen.requests)} image(s) to make, in order, as listed in {req}. Save each to its "
+                "'output' path, then rerun this command to animate them.")
+            return None
+        shots = [host.upload(s) for s in stills]
         segs = []
         for i, b in enumerate(plan["beats"]):
             say(f"higgsfield: segment {i + 1}/{len(plan['beats'])}...")
@@ -212,6 +233,9 @@ def parser() -> argparse.ArgumentParser:
         sp.add_argument("--draft", action=argparse.BooleanOptionalAction, default=True,
                         help="Veo 3.1 Fast (default) or --no-draft for Veo 3.1")
         sp.add_argument("--yes", action="store_true", help="allow paid Higgsfield calls")
+        sp.add_argument("--images", choices=("auto", *images.PROVIDERS),
+                        help="who makes the stills (default: STANDIN_IMAGES or auto: codex, gemini, openai, "
+                             "then higgsfield)")
 
     for name, text in (("plan", "write a shot plan"), ("preview", "free local preview: plan, Blender, voice"),
                        ("make", "full photoreal video with Higgsfield (paid; needs --yes)")):

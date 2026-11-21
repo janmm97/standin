@@ -27,8 +27,9 @@ DONE, BAD = "completed", ("failed", "nsfw", "canceled")
 MEDIA = (".png", ".jpg", ".jpeg", ".webp", ".mp4", ".mov", ".webm")
 
 
-def estimate(plan: dict, draft: bool = True) -> dict:
-    n_cast, n_keys = len(plan["cast"]), 2 * len(plan["beats"])  # a start and end frame per beat
+def estimate(plan: dict, draft: bool = True, images: bool = True) -> dict:
+    """Higgsfield spend; images=False when another provider makes the stills."""
+    n_cast, n_keys = len(plan["cast"]) * images, 2 * len(plan["beats"]) * images  # 2 frames per beat
     secs = sum(b["duration"] for b in plan["beats"])
     rate = PRICE["veo_fast_per_s" if draft else "veo_per_s"]
     parts = {"soul": n_cast * PRICE["soul"], "nano_banana": n_keys * PRICE["nano_banana"], "veo": secs * rate}
@@ -47,9 +48,10 @@ def pose_prompt(n_cast: int, shot_prompt: str) -> str:
             + shot_prompt)
 
 
-def insert_body(pose_url: str, cast_urls: list[str], shot_prompt: str, aspect: str) -> dict:
+def insert_body(pose_url: str, cast_urls: list[str], prompt: str, aspect: str) -> dict:
+    """`prompt` is the full instruction, normally pose_prompt(...)."""
     return {
-        "prompt": pose_prompt(len(cast_urls), shot_prompt),
+        "prompt": prompt,
         "num_images": 1, "aspect_ratio": aspect, "output_format": "png",
         # The docs leave this item schema unresolved; this shape is a best guess, not verified.
         "input_images": [{"type": "image_url", "image_url": u} for u in [pose_url, *cast_urls]],

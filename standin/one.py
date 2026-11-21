@@ -13,23 +13,27 @@ class OneError(RuntimeError):
     pass
 
 
-def _one() -> list[str]:
-    exe = shutil.which("one")
+def npm_cmd(name: str, script: str, hint: str) -> list[str]:
+    """The command for an npm-installed CLI. npm installs a .cmd shim on Windows, and cmd.exe re-parses its
+    command line, so & | > % in a prompt or path could run commands or expand variables. Run the CLI's
+    node script directly so cmd.exe never sees the arguments."""
+    exe = shutil.which(name)
     if not exe:
-        raise OneError("One CLI not found: install it (npm i -g @withone/cli), "
-                       "then `one init` and `one add higgsfield-ai`")
+        raise OneError(f"{name} not found: {hint}")
     if not exe.lower().endswith((".cmd", ".bat")):
         return [exe]
-    # npm installs `one` as a .cmd shim on Windows. cmd.exe re-parses its command line, and the JSON body's
-    # own quotes leave prompt text unquoted, so & | > % in a prompt would run commands or expand variables.
-    # Run the CLI's node script directly so cmd.exe never sees the arguments.
     d = Path(exe).parent
-    js = d / "node_modules" / "@withone" / "cli" / "bin" / "cli.js"
+    js = d / "node_modules" / script
     node = str(d / "node.exe") if (d / "node.exe").is_file() else shutil.which("node")
     if not (js.is_file() and node):
-        raise OneError(f"refusing to run One through the {exe} shim (unsafe for prompt text); "
+        raise OneError(f"refusing to run {name} through the {exe} shim (unsafe for prompt text); "
                        f"expected {js} and node on PATH")
     return [node, str(js)]
+
+
+def _one() -> list[str]:
+    return npm_cmd("one", "@withone/cli/bin/cli.js",
+                   "install it (npm i -g @withone/cli), then `one init` and `one add higgsfield-ai`")
 
 
 def execute(platform: str, action_id: str, key: str, data: dict | None = None,
