@@ -35,7 +35,7 @@ def test_speak_and_voice_over(tmp_path):
     wav, spoken = voice.voice_over(plan, "orpheus", tmp_path / "vo.wav", post=post,
                                    decoder=lambda layers: pcm_per_line)
     assert seen[0][0].endswith("/completions") and seen[0][1]["prompt"].startswith("<|audio|>tara: ")
-    assert spoken == [1.0, 1.0, 1.0]
+    assert spoken == [0.0, 1.0, 0.0]  # the template speaks only in its middle beat
     with wave.open(str(wav)) as w:
         assert w.getframerate() == 24000 and w.getnframes() == 14 * 24000
 

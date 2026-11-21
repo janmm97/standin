@@ -28,26 +28,28 @@ MEDIA = (".png", ".jpg", ".jpeg", ".webp", ".mp4", ".mov", ".webm")
 
 
 def estimate(plan: dict, draft: bool = True) -> dict:
-    n_cast, n_keys = len(plan["cast"]), len(plan["beats"]) + 1
+    n_cast, n_keys = len(plan["cast"]), 2 * len(plan["beats"])  # a start and end frame per beat
     secs = sum(b["duration"] for b in plan["beats"])
     rate = PRICE["veo_fast_per_s" if draft else "veo_per_s"]
     parts = {"soul": n_cast * PRICE["soul"], "nano_banana": n_keys * PRICE["nano_banana"], "veo": secs * rate}
     return {**{k: round(v, 2) for k, v in parts.items()}, "total": round(sum(parts.values()), 2)}
 
 
-def soul_body(member: dict, aspect: str) -> dict:
-    return {"prompt": f"photoreal full-body photo of {member['look']}, plain light studio background, "
-                      "natural skin texture, soft light", "num_images": 1, "resolution": "2K",
-            "aspect_ratio": aspect}
+def soul_body(prompt: str, aspect: str) -> dict:
+    return {"prompt": prompt, "num_images": 1, "resolution": "2K", "aspect_ratio": aspect}
 
 
-def insert_body(pose_url: str, cast_urls: list[str], scene: str, aspect: str) -> dict:
-    who = "; ".join(f"mannequin {i + 1} becomes the person in reference image {i + 2}"
-                    for i in range(len(cast_urls)))
+def pose_prompt(n_cast: int, shot_prompt: str) -> str:
+    """Image 1 is the Blender blocking frame; images 2.. are the cast. Shared by every image provider."""
+    who = "; ".join(f"mannequin {i + 1} becomes the person in reference image {i + 2}" for i in range(n_cast))
+    return ("Image 1 is a pose and camera reference made of grey mannequins: keep every body pose, position "
+            f"and the camera framing exactly, but replace the grey set with the real location. {who}. "
+            + shot_prompt)
+
+
+def insert_body(pose_url: str, cast_urls: list[str], shot_prompt: str, aspect: str) -> dict:
     return {
-        "prompt": ("Photoreal film still. Image 1 is a pose reference made of grey mannequins: keep every "
-                   f"body pose, position and the camera framing exactly. {who}. Setting: {scene}. "
-                   "No mannequins, no text."),
+        "prompt": pose_prompt(len(cast_urls), shot_prompt),
         "num_images": 1, "aspect_ratio": aspect, "output_format": "png",
         # The docs leave this item schema unresolved; this shape is a best guess, not verified.
         "input_images": [{"type": "image_url", "image_url": u} for u in [pose_url, *cast_urls]],

@@ -9,6 +9,8 @@ import json
 import os
 import urllib.request
 
+from .direction import ANGLES, DEFAULT_LOOK, SHOTS
+
 PRESETS = ("walk_in", "wave", "point", "hand_off", "turn_to_camera", "sit", "idle")
 CAMERAS = ("static", "dolly", "orbit", "handheld")
 DURATIONS = (4, 6, 8)
@@ -18,9 +20,11 @@ MAX_BEATS = 6
 
 SCHEMA = {
     "type": "object",
-    "required": ["title", "cast", "beats"],
+    "required": ["title", "location", "look", "cast", "beats"],
     "properties": {
         "title": {"type": "string"},
+        "location": {"type": "string"},
+        "look": {"type": "string"},
         "cast": {
             "type": "array", "minItems": 1, "maxItems": 3,
             "items": {"type": "object", "required": ["name", "look"],
@@ -29,8 +33,11 @@ SCHEMA = {
         "beats": {
             "type": "array", "minItems": 1, "maxItems": MAX_BEATS,
             "items": {
-                "type": "object", "required": ["action", "camera", "duration", "scene", "vo"],
+                "type": "object",
+                "required": ["shot", "angle", "action", "camera", "duration", "scene", "vo"],
                 "properties": {
+                    "shot": {"type": "string", "enum": list(SHOTS)},
+                    "angle": {"type": "string", "enum": list(ANGLES)},
                     "action": {"type": "string", "enum": list(PRESETS)},
                     "camera": {"type": "string", "enum": list(CAMERAS)},
                     "duration": {"type": "integer", "enum": list(DURATIONS)},
@@ -43,11 +50,19 @@ SCHEMA = {
 }
 
 SYSTEM = (
-    "You plan short vertical marketing videos. Reply with JSON only. "
-    f"Each beat uses one action from {', '.join(PRESETS)} and one camera from {', '.join(CAMERAS)}; "
-    "duration is 4, 6 or 8 seconds. 'scene' describes the photoreal setting and what the actor does. "
-    "'vo' is the voice-over line for that beat: about 2.5 words per second, plain spoken English. "
-    "'look' describes each actor's appearance (age, clothing, hair) without naming real people."
+    "You are the director and cinematographer of a short vertical ad. Reply with JSON only. "
+    "'location' is ONE specific, real-feeling place used for every beat (materials, time of day, practical "
+    "lights), e.g. 'narrow corner cafe, worn oak counter, snow outside the window, 7am'. "
+    "'look' is the visual style for the whole film: light, palette, lens feel and grain, e.g. 'soft cold "
+    "window key, warm tungsten practicals, muted creams and browns, 35mm film grain'. "
+    f"Each beat: 'shot' is one of {', '.join(SHOTS)}; vary them (open wide, then go closer, and use a "
+    f"'detail' insert on the product). 'angle' is one of {', '.join(ANGLES)}. 'action' is one of "
+    f"{', '.join(PRESETS)}; 'camera' is one of {', '.join(CAMERAS)}; duration is 4, 6 or 8 seconds. "
+    "'scene' says exactly what we see in this frame: who does what, with which object, where the light "
+    "falls. Be concrete; never use filler words like 'modern space', 'stunning' or 'vibrant'. "
+    "'vo' is the spoken line for that beat, about 2.5 words per second: hook the viewer in the first "
+    "line, never just repeat the brief, end on a clear call to action; a beat may have an empty 'vo'. "
+    "'look' on each cast member describes their appearance (age, clothing, hair) without naming real people."
 )
 
 
@@ -79,6 +94,8 @@ def normalize(raw: dict, aspect: str = "9:16") -> dict:
         if not isinstance(b, dict):
             continue
         beats.append({
+            "shot": _pick(b.get("shot"), SHOTS, "medium"),
+            "angle": _pick(b.get("angle"), ANGLES, "eye"),
             "action": _pick(b.get("action"), PRESETS, "idle"),
             "camera": _pick(b.get("camera"), CAMERAS, "static"),
             "duration": _duration(b.get("duration")),
@@ -89,6 +106,8 @@ def normalize(raw: dict, aspect: str = "9:16") -> dict:
         raise ValueError("plan has no beats")
     return {
         "title": str(raw.get("title") or "untitled")[:80],
+        "location": " ".join(str(raw.get("location") or "").split())[:300],
+        "look": " ".join(str(raw.get("look") or "").split())[:300] or DEFAULT_LOOK,
         "aspect": aspect if aspect in ASPECTS else "9:16",
         "voice": _pick(raw.get("voice"), VOICES, "tara"),
         "cast": cast,
@@ -97,19 +116,23 @@ def normalize(raw: dict, aspect: str = "9:16") -> dict:
 
 
 def template_plan(brief: str, aspect: str = "9:16") -> dict:
-    """A fixed 3-beat plan that works with no model at all."""
+    """A fixed 3-beat plan that works with no model: wide, detail, close. Its only line is the brief, so
+    rewrite the 'vo' (and 'location') in plan.json, or let a model write the plan, for real copy."""
     brief = " ".join(brief.split())
     return normalize({
         "title": brief[:60] or "standin clip",
-        "cast": [{"name": "Host", "look": "friendly presenter in their 30s, casual smart clothes"}],
+        "location": f"a specific, lived-in real-world place where this naturally happens: {brief}",
+        "look": DEFAULT_LOOK,
+        "cast": [{"name": "Host",
+                  "look": "a person in their 30s, understated everyday clothes, natural hair"}],
         "beats": [
-            {"action": "walk_in", "camera": "dolly", "duration": 4,
-             "scene": f"bright modern space; the host walks in. Topic: {brief}",
-             "vo": "Here's something worth a look."},
-            {"action": "point", "camera": "static", "duration": 6,
-             "scene": f"the host points to the side while explaining: {brief}", "vo": brief[:150]},
-            {"action": "turn_to_camera", "camera": "orbit", "duration": 4,
-             "scene": "the host turns to camera and smiles", "vo": "Try it today."},
+            {"shot": "wide", "angle": "eye", "action": "walk_in", "camera": "dolly", "duration": 4,
+             "scene": "the host walks into frame through the space, light falling across them", "vo": ""},
+            {"shot": "detail", "angle": "high", "action": "point", "camera": "static", "duration": 6,
+             "scene": f"the host's hand gestures to the product, sharp in the foreground. Subject: {brief}",
+             "vo": brief[:150]},
+            {"shot": "close", "angle": "low", "action": "turn_to_camera", "camera": "orbit", "duration": 4,
+             "scene": "the host turns toward the camera with a small, unforced smile", "vo": ""},
         ],
     }, aspect)
 
@@ -156,11 +179,13 @@ def make_plan(brief: str, model: str | None, aspect: str = "9:16", post=None) ->
 
 
 def keyframe_frames(plan: dict, fps: int = 24) -> list[int]:
-    """Frame numbers at every beat boundary, starting at 1: N beats -> N + 1 keyframes."""
-    frames, t = [1], 0
-    for b in plan["beats"]:
-        t += b["duration"]
-        frames.append(1 + t * fps)
+    """The first and last frame of every beat: N beats -> 2N keyframes. Beats cut from one shot to the
+    next (frame s ends beat i-1, frame s + 1 opens beat i), so each video segment gets its own pair."""
+    frames, s = [], 1
+    for i, b in enumerate(plan["beats"]):
+        e = s + b["duration"] * fps
+        frames += [s if i == 0 else s + 1, e]
+        s = e
     return frames
 
 

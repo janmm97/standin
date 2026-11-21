@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Changed
+- Cinematic direction: plans now have a `location` and a `look`, and each beat has a `shot` (wide/medium/close/detail) and an `angle` (eye/low/high). Each prompt is written as a cinematographer's brief: framing, prime lens, angle, location, look, craft, and a list of AI tells to avoid.
+- Blender frames each beat by shot size, lens and angle, with shadows, cavity and depth of field, so the mannequin reference already has a composition.
+- Beats cut instead of morphing: 2 keyframes per beat (first and last), so Veo animates each shot on its own. The template plan's estimate rises from $1.58 to $1.66.
+- The template plan is wide, then a detail insert, then a close-up. Only the middle beat speaks.
+
 ### Added
 - Project scaffold: MIT licence, contributing guide, code of conduct, security policy, templates and CI.
 - Local model discovery: reads `lms ls --json`, picks the largest chat model LM Studio says will fit (`lms load --estimate-only`), skips embedding and voice (Orpheus) models, and starts the server and loads it.

@@ -16,7 +16,7 @@ class P:
 def test_estimate_draft_and_final():
     plan = template_plan("x")  # 1 cast, 3 beats, 14 s
     assert higgsfield.estimate(plan, draft=True) == {
-        "soul": 0.02, "nano_banana": 0.16, "veo": 1.4, "total": 1.58}
+        "soul": 0.02, "nano_banana": 0.24, "veo": 1.4, "total": 1.66}
     assert higgsfield.estimate(plan, draft=False)["veo"] == 5.6
 
 

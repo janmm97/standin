@@ -108,23 +108,51 @@ def act(action, j, s, e, home, other=None, first=True):
             key(j["torso"], "scale", f, (1, 1, 1.0 + 0.02 * (k % 2)))
 
 
-def camera(beat, s, e, target, rng, first=True):
+# Shot size -> metres of frame height, aim height and prime lens; angle -> camera elevation (degrees).
+FRAME_H = {"wide": 4.0, "medium": 1.3, "close": 0.65, "detail": 0.5}
+AIM_Z = {"wide": 1.0, "medium": 1.25, "close": 1.65, "detail": 1.4}
+LENS = {"wide": 24, "medium": 35, "close": 50, "detail": 85}
+PITCH = {"eye": 0.0, "low": -12.0, "high": 18.0}
+
+
+def camera(beat, s, e, aim_x, rng, portrait, first=True):
+    """Frame the beat's shot size with its lens and angle, then move. Beats cut: the new framing is keyed
+    at s + 1 so frame s keeps the previous beat's last framing (it is that beat's end keyframe)."""
     cam_obj = bpy.context.scene.camera
-    rig = cam_obj.parent
+    rig, target = cam_obj.parent, cam_obj.constraints[0].target
+    shot = beat.get("shot", "medium")
+    lens = LENS.get(shot, 35)
+    sensor_v = 36.0 if portrait else 36.0 * 9 / 16  # sensor fit AUTO spans the longer side
+    dist = FRAME_H.get(shot, 1.3) * lens / sensor_v
+    pitch = math.radians(PITCH.get(beat.get("angle"), 0.0))
+    # A detail insert looks at the gesturing (right, -x) hand in front of the chest from 40 degrees off
+    # its side, so the gesture reads in profile and the resting left arm doesn't block the lens.
+    detail = shot == "detail"
+    aim = (aim_x, -0.5 if detail else 0.0, AIM_Z.get(shot, 1.25))
+    yaw0 = math.radians(-40 if detail else 0)
+    at = s if first else s + 1
+
+    def place(f, d, yaw=0.0):
+        key(rig, "location", f, (aim[0], aim[1], 0))
+        key(rig, "rotation_euler", f, (0, 0, yaw0 + yaw))
+        key(cam_obj, "location", f, (0, -d * math.cos(pitch), aim[2] + d * math.sin(pitch)))
+        key(target, "location", f, aim)
+        key(cam_obj.data, "lens", f, lens)
+
+    place(at, dist)
     kind = beat["camera"]
-    at = s if first else s + 1  # same reason as in act(): keep the previous beat's end framing at s
-    key(rig, "rotation_euler", at, (0, 0, 0))
-    key(cam_obj, "location", at, (0, -4.6, 1.3))
     if kind == "dolly":
-        key(cam_obj, "location", e, (0, -3.2, 1.3))
+        place(e, dist * 0.8)
     elif kind == "orbit":
-        key(rig, "rotation_euler", e, (0, 0, math.radians(30)))
+        place(e, dist, math.radians(25))
     elif kind == "handheld":
-        for f in range(s + 6, e, 6):
-            key(cam_obj, "location", f, (rng.uniform(-0.05, 0.05), -4.6 + rng.uniform(-0.05, 0.05),
-                                         1.3 + rng.uniform(-0.04, 0.04)))
-    key(cam_obj, "location", e, tuple(cam_obj.location))
-    key(rig, "rotation_euler", e, tuple(rig.rotation_euler))
+        j = 0.02 * dist
+        for f in range(at + 6, e, 6):
+            key(cam_obj, "location", f, (rng.uniform(-j, j), -dist * math.cos(pitch) + rng.uniform(-j, j),
+                                         aim[2] + dist * math.sin(pitch) + rng.uniform(-j, j)))
+        place(e, dist)
+    else:
+        place(e, dist)
 
 
 def build(plan, scale):
@@ -133,6 +161,9 @@ def build(plan, scale):
     sc.render.engine = "BLENDER_WORKBENCH"
     sc.display.shading.light = "STUDIO"
     sc.display.shading.color_type = "OBJECT"
+    sc.display.shading.show_shadows = True
+    sc.display.shading.show_cavity = True
+    sc.display.shading.use_dof = True  # Workbench honours the camera's depth of field
     sc.render.fps = FPS
     w, h = (720, 1280) if plan.get("aspect", "9:16") == "9:16" else (1280, 720)
     sc.render.resolution_x, sc.render.resolution_y = w, h
@@ -150,6 +181,7 @@ def build(plan, scale):
     sc.collection.objects.link(cam)
     cam.parent = rig
     cam.data.lens = 35
+    cam.data.dof.use_dof, cam.data.dof.focus_object, cam.data.dof.aperture_fstop = True, target, 2.8
     tr = cam.constraints.new("TRACK_TO")
     tr.target, tr.track_axis, tr.up_axis = target, "TRACK_NEGATIVE_Z", "UP_Y"
     sc.camera = cam
@@ -176,7 +208,7 @@ def build(plan, scale):
                 act(b["action"], j, s, e, home, other, first=i == 0)
             else:
                 act("idle", j, s, e, home, first=i == 0)
-        camera(b, s, e, target, rng, first=i == 0)
+        camera(b, s, e, xs[lead], rng, h > w, first=i == 0)
         s = e
     sc.frame_start, sc.frame_end = 1, s
     return s
@@ -194,10 +226,11 @@ def main():
         sc.render.filepath = os.path.join(out, "preview", "f_")
         bpy.ops.render.render(animation=True)
     else:
-        frames, t = [1], 0
-        for b in plan["beats"]:
-            t += b["duration"]
-            frames.append(1 + t * FPS)
+        frames, s = [], 1  # first and last frame of every beat (same as plan.keyframe_frames)
+        for i, b in enumerate(plan["beats"]):
+            e = s + b["duration"] * FPS
+            frames += [s if i == 0 else s + 1, e]
+            s = e
         for i, fr in enumerate(frames):
             sc.frame_set(fr)
             sc.render.filepath = os.path.join(out, "keys", f"k_{i:02d}.png")

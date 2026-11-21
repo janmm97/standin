@@ -12,7 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import blender_run, edit, higgsfield, models, one, voice
+from . import blender_run, direction, edit, higgsfield, models, one, voice
 from .host import Host
 from .plan import ASPECTS, make_plan, normalize, template_plan
 
@@ -144,25 +144,27 @@ def make(a) -> Path | None:
         return None
     client, host = higgsfield.Client(), Host()  # fail on missing setup before the slow render
     keys = blender_run.render(plan, d, "keys")
-    if len(keys) != len(plan["beats"]) + 1:  # one keyframe per beat boundary; check before spending
-        raise RuntimeError(f"Blender wrote {len(keys)} keyframes, expected {len(plan['beats']) + 1}")
+    if len(keys) != 2 * len(plan["beats"]):  # a first and last frame per beat; check before spending
+        raise RuntimeError(f"Blender wrote {len(keys)} keyframes, expected {2 * len(plan['beats'])}")
     try:
         cast_urls = []
         for i, member in enumerate(plan["cast"]):
             say(f"higgsfield: casting {member['name']}...")
-            body = higgsfield.soul_body(member, plan["aspect"])
+            body = higgsfield.soul_body(direction.cast_prompt(plan, member), plan["aspect"])
             img = paid(client, "soul", body, d / "cast" / f"c_{i}.png")
             cast_urls.append(host.upload(img))
         shots = []
         for i, k in enumerate(keys):
             say(f"higgsfield: keyframe {i + 1}/{len(keys)}...")
-            scene = plan["beats"][min(i, len(plan["beats"]) - 1)]["scene"]
-            body = higgsfield.insert_body(host.upload(k), cast_urls, scene, plan["aspect"])
+            beat = plan["beats"][i // 2]  # keys come in (first, last) pairs per beat
+            prompt = direction.still_prompt(plan, beat, end=i % 2)
+            body = higgsfield.insert_body(host.upload(k), cast_urls, prompt, plan["aspect"])
             shots.append(host.upload(paid(client, "nano_banana", body, d / "shots" / f"s_{i:02}.png")))
         segs = []
         for i, b in enumerate(plan["beats"]):
             say(f"higgsfield: segment {i + 1}/{len(plan['beats'])}...")
-            body = higgsfield.veo_body(shots[i], shots[i + 1], b["scene"], b["duration"], plan["aspect"])
+            body = higgsfield.veo_body(shots[2 * i], shots[2 * i + 1], direction.motion_prompt(plan, b),
+                                      b["duration"], plan["aspect"])
             model = "veo_fast" if a.draft else "veo"
             segs.append(paid(client, model, body, d / "segments" / f"seg_{i:02}.mp4"))
     finally:

@@ -52,6 +52,17 @@ standin batch briefs.csv --make --yes
 
 Other options: `--aspect 16:9`, `--template` (skip the local model), `--no-vo`, `--out <folder>`.
 
+## Directing the shot
+
+Generic prompts give generic AI images. standin writes every prompt the way a director and a cinematographer would brief a crew:
+
+- **One location and one look per film.** `plan.json` has a concrete `location` (for example "narrow corner cafe, worn oak counter, snow outside the window, 7am") and a `look` (light, palette, grain). Every keyframe and every video segment gets both, so the shots match.
+- **Shot sizes, angles and lenses.** Each beat has a `shot` (`wide`, `medium`, `close`, `detail`) and an `angle` (`eye`, `low`, `high`). Blender frames the mannequins to match, using a 24, 35, 50 or 85 mm prime, so the image model gets a real composition to follow rather than a centred figure.
+- **Real cuts.** Each beat gets its own first and last keyframe (2 per beat), so a wide shot cuts to a close-up instead of morphing into it.
+- **Craft and what to avoid.** Each prompt asks for a cinema camera, shallow depth of field, real skin and materials, and motivated light. It rules out plastic skin, HDR colour, stock-photo grins, warped hands, text and watermarks.
+
+The look is only as good as the plan. A capable local model writes a usable one. The `--template` plan is a fallback: its only line is your brief, and its location is generic. For a real ad, write `location`, `look`, `scene` and `vo` in `plan.json` yourself (or have any chat assistant write the plan against the schema in `standin/plan.py`), then run `preview` again before `make`.
+
 ## Picking the local model
 
 `standin models` reads `lms ls --json`. It ignores embedding models and voice (Orpheus) models, sorts the chat models by parameter count, and asks LM Studio (`lms load <model> --estimate-only`) whether each one fits your machine. The biggest one that fits writes the plan. Set `STANDIN_CHAT_MODEL` to choose one yourself.
@@ -79,7 +90,7 @@ Any tool works: `{path}` is the local file and `{key}` is a random object name. 
 
 ## Cost
 
-`make` always prints an estimate first and needs `--yes` before it spends anything. With rough 2026-11 prices, the 3-beat template plan (1 actor, 14 s) comes to about $1.58 on Veo 3.1 Fast. A 4-beat, 2-actor, 22 s plan comes to about $9 on Veo 3.1. Check Higgsfield's current pricing.
+`make` always prints an estimate first and needs `--yes` before it spends anything. With rough 2026-11 prices, the 3-beat template plan (1 actor, 14 s) comes to about $1.66 on Veo 3.1 Fast. A 4-beat, 2-actor, 22 s plan comes to about $9 on Veo 3.1. Check Higgsfield's current pricing.
 
 ## Measured on a laptop
 
